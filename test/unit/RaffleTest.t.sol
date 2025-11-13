@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {DeployRaffle} from "script/DeployRaffle.s.sol";
 import {Raffle} from "src/Raffle.sol";
 import {HelperConfig} from "script/HelperConfig.s.sol";
@@ -69,10 +69,10 @@ contract RaffleTest is Test {
         // Arrange
         vm.prank(player);
         // Act
-        vm.expectEmit(true, false, false, false, address(raffle)); // Expectativa del evento que se va a emitir
-        emit RaffleEntered(player); // Tipo de evento a esperar - plantilla
+        vm.expectEmit(true, false, false, false, address(raffle)); // Expectativa del evento que se va a emitir, indicando las variables a comprobar
+        emit RaffleEntered(player); // Tipo de evento a esperar (valores de variables) - plantilla
         // Assert
-        raffle.enterRaffle{value: entranceFee}(); // Aqui se emite el evento
+        raffle.enterRaffle{value: entranceFee}(); // Aqui se emite el evento - debe coincidir con el de la plantilla en valores (obviamente solo de las variables marcadas como true en el expectEmit)
     }
 
     function testDontAllowPlayersToEnterWhileRaffleIsCalculating() public {
@@ -84,8 +84,36 @@ contract RaffleTest is Test {
         raffle.performUpkeep("");
 
         // Act - Assert
-        vm.expectRevert();
+        vm.expectRevert(Raffle.Raffle__RaffleNotOpen.selector);
         vm.prank(player);
         raffle.enterRaffle{value: entranceFee}();
+    }
+
+    // Check Upkeep
+    function testCheckUpkeepReturnsFalseIfItHasNoBalance() public {
+        // Arrange
+        vm.warp(block.timestamp + interval + 1);
+        vm.roll(block.number + 1);
+
+        // Act 
+        (bool upkeepNeeded, ) = raffle.checkUpKeep("");
+
+        // Assert
+        assert(!upkeepNeeded);
+    }
+
+    function testCheckUpkeepReturnsFalseIfRaffleIsntOpen() public {
+        // Arrange
+        vm.prank(player);
+        raffle.enterRaffle{value: entranceFee}();
+        vm.warp(block.timestamp + interval + 1);
+        vm.roll(block.number + 1);
+        raffle.performUpkeep("");
+
+        // Act
+        (bool upkeepNeeded,) = raffle.checkUpKeep("");
+
+        // Assert
+        assert(!upkeepNeeded);
     }
 }
